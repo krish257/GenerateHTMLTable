@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Table with Sorting, Filtering, Search, Pagination</title>
+    <style>
+        table, th, td {
+            border: 1px solid black;
+            border-collapse: collapse;
+            padding: 8px;
+        }
+
+        th {
+            cursor: pointer;
+        }
+
+        #search {
+            margin-bottom: 10px;
+            padding: 5px;
+        }
+
+        .pagination {
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+            .pagination a {
+                margin: 0 5px;
+                text-decoration: none;
+                padding: 5px 10px;
+                border: 1px solid #ddd;
+            }
+
+                .pagination a.active {
+                    background-color: #4CAF50;
+                    color: white;
+                }
+
+                .pagination a:hover {
+                    background-color: #ddd;
+                }
+
+            .pagination .total-count {
+                margin-left: 20px;
+            }
+
+        .sorting-icon {
+            margin-left: 5px;
+            font-size: 12px;
+            float:right;
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: space-evenly;
+        }
+
+            .action-buttons button {
+                margin: 0 5px;
+                cursor: pointer;
+            }
+    </style>
+</head>
+<body>
+
+    <input type="text" id="search" placeholder="Search..." onkeyup="searchTable()">
+    <div id="table-container"></div>
+
+    <div class="pagination" id="pagination"></div>
+
+    <script>
+        // The main function to generate the dynamic table
+        function generateDynamicTable(headers, tableID, data) {
+            let currentPage = 1;
+            const rowsPerPage = 5;
+            let filteredData = data;
+            let sortColumn = null;
+            let sortDirection = 'asc';  // 'asc' or 'desc'
+
+            // Render the table
+            function renderTable() {
+                const tableContainer = document.getElementById(tableID);
+                tableContainer.innerHTML = '';
+
+                const table = document.createElement('table');
+                const thead = document.createElement('thead');
+                const tbody = document.createElement('tbody');
+
+                // Create table header
+                const headerRow = document.createElement('tr');
+                headers.forEach((header, index) => {
+                    const th = document.createElement('th');
+                    th.textContent = header.name; // Use name field for header
+                    th.addEventListener('click', () => sortTable(index));
+
+                    // Add sorting icons
+                    const icon = document.createElement('span');
+                    icon.classList.add('sorting-icon');
+                    if (sortColumn === index) {
+                        icon.textContent = sortDirection === 'asc' ? '↑' : '↓';
+                    }
+                    th.appendChild(icon);
+                    headerRow.appendChild(th);
+                });
+                const actionTh = document.createElement('th');
+                actionTh.textContent = "Actions";  // Add an extra column for Actions
+                headerRow.appendChild(actionTh);
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
+
+                // Create table rows
+                const startIndex = (currentPage - 1) * rowsPerPage;
+                const endIndex = startIndex + rowsPerPage;
+                const currentData = filteredData.slice(startIndex, endIndex);
+
+                currentData.forEach((row, rowIndex) => {
+                    const tr = document.createElement('tr');
+                    headers.forEach((header, index) => {
+                        const td = document.createElement('td');
+                        td.textContent = row[header.field]; // Use the field for row data
+                        tr.appendChild(td);
+                    });
+
+                    // Action buttons (Edit and Delete)
+                    const actionTd = document.createElement('td');
+                    actionTd.classList.add('action-buttons');
+                    const editButton = document.createElement('button');
+                    editButton.textContent = 'Edit';
+                    editButton.onclick = () => editRow(rowIndex);
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = 'Delete';
+                    deleteButton.onclick = () => deleteRow(rowIndex);
+
+                    actionTd.appendChild(editButton);
+                    actionTd.appendChild(deleteButton);
+                    tr.appendChild(actionTd);
+
+                    tbody.appendChild(tr);
+                });
+                table.appendChild(tbody);
+                tableContainer.appendChild(table);
+
+                renderPagination();
+            }
+
+            // Sort the table based on the column clicked
+            function sortTable(columnIndex) {
+                const key = headers[columnIndex].field; // Use the field name for sorting
+                const isNumber = typeof filteredData[0][key] === 'number';
+
+                // Toggle sort direction
+                if (sortColumn === columnIndex) {
+                    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortColumn = columnIndex;
+                    sortDirection = 'asc';
+                }
+
+                filteredData.sort((a, b) => {
+                    let valA = a[key];
+                    let valB = b[key];
+
+                    if (isNumber) {
+                        return sortDirection === 'asc' ? valA - valB : valB - valA;
+                    } else {
+                        return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                    }
+                });
+
+                renderTable();
+            }
+
+            // Render pagination controls
+            function renderPagination() {
+                const pagination = document.getElementById('pagination');
+                pagination.innerHTML = '';
+
+                const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+
+                for (let i = 1; i <= totalPages; i++) {
+                    const pageLink = document.createElement('a');
+                    pageLink.textContent = i;
+                    pageLink.href = '#';
+                    pageLink.classList.toggle('active', i === currentPage);
+                    pageLink.addEventListener('click', () => changePage(i));
+                    pagination.appendChild(pageLink);
+                }
+
+                const totalCount = document.createElement('span');
+                totalCount.classList.add('total-count');
+                totalCount.textContent = `Total: ${filteredData.length} rows`;
+                pagination.appendChild(totalCount);
+            }
+
+            // Change the current page when pagination links are clicked
+            function changePage(page) {
+                currentPage = page;
+                renderTable();
+            }
+
+            // Search functionality to filter data
+            function searchTable() {
+                const query = document.getElementById('search').value.toLowerCase();
+                filteredData = data.filter(row => {
+                    return Object.values(row).some(value => value.toString().toLowerCase().includes(query));
+                });
+                currentPage = 1;
+                renderTable();
+            }
+
+            // Edit Row
+            function editRow(rowIndex) {
+                const row = filteredData[rowIndex];
+                alert(`Editing: ${JSON.stringify(row)}`);
+                // Here you can implement a full edit form instead of an alert
+            }
+
+            // Delete Row
+            function deleteRow(rowIndex) {
+                if (confirm("Are you sure you want to delete this row?")) {
+                    filteredData.splice(rowIndex, 1);
+                    renderTable();
+                }
+            }
+
+            // Initialize the table rendering
+            document.getElementById('search').addEventListener('input', searchTable);
+            renderTable(); // Initial render
+        }
+
+        // Example usage of the generateDynamicTable function
+        const headers = [
+            { name: 'Full Name', field: 'name' },
+            { name: 'Age', field: 'age' },
+            { name: 'Country', field: 'country' }
+        ];
+
+        const data = [
+            { name: "John Doe", age: 25, country: "USA" },
+            { name: "Jane Smith", age: 30, country: "Canada" },
+            { name: "Sam Brown", age: 22, country: "UK" },
+            { name: "Sara Wilson", age: 28, country: "Australia" },
+            { name: "James Johnson", age: 35, country: "USA" },
+            { name: "Mary Davis", age: 24, country: "USA" },
+            { name: "Michael Clark", age: 40, country: "Canada" },
+            { name: "Emily Lee", age: 33, country: "UK" },
+            { name: "David Martin", age: 26, country: "Australia" },
+            { name: "Sophia White", age: 27, country: "USA" }
+        ];
+
+        generateDynamicTable(headers, 'table-container', data);  // Call the function
+    </script>
+
+</body>
+</html>
